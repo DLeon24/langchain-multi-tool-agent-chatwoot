@@ -127,9 +127,10 @@ This project is an **AI Agent Orchestrator** that runs four progressively comple
 │   ├── __init__.py
 │   ├── knowledge_base.py             # search_ai_perupe (Supabase)
 │   └── internet_search.py            # search_internet (Tavily)
-└── landing-page/
+└── assets/
     ├── prompt.txt                    # Script snippet for Chatwoot widget
-    └── image.png                     # Landing asset (e.g. for design/docs)
+    ├── landing-reference.png         # Landing reference image
+    └── step-1.png … step-8.png       # Example flow screenshots
 ```
 
 ---
@@ -173,7 +174,7 @@ You need a Chatwoot instance that can POST webhooks to your app and that your ap
 
 In Chatwoot you must also:
 
-- **Create an Inbox** (e.g. website channel) so the widget can connect and messages reach your app; the inbox gives you the widget script and the `websiteToken` used in `landing-page/prompt.txt`.
+- **Create an Inbox** (e.g. website channel) so the widget can connect and messages reach your app; the inbox gives you the widget script and the `websiteToken` used in `assets/prompt.txt`.
 - **Create human agents** (team members) if you use handoff; the app adds labels like `human-attends` so a human can take over.
 - **Create labels** used by the app: at least the activation label (e.g. `ai-attends` for opt-in) and/or the disable label (e.g. `ai-off` for opt-out/bot). Create these in Chatwoot so they can be assigned to conversations.
 - **Create the bot** (optional): in bot mode, create a Bot in Chatwoot and use its token as `CHATWOOT_BOT_TOKEN` so replies appear with the bot’s name and avatar.
@@ -182,16 +183,52 @@ In Chatwoot you must also:
   - **assign-sales-team** — Event: *Conversation Updated*. Condition: *Status* equal to *Open*. Action: *Assign a Team* → e.g. sales team. Assigns new/open conversations to the right team.
   - **snoozed_message_reminder** — Event: *Conversation Updated*. Condition: *Status* equal to *Snoozed*. Action: *Send a Message* → e.g. “Remember, we're here to help you when you get back!”. Sends an automatic reminder when the conversation is snoozed.
 
+**Example flow of the app (visual)**
+
+The following describes the **full flow of the app as the user sees it** in the Chatwoot widget. It applies especially in **opt-out or bot mode** (where the label `ai-off` is used to pause the bot).
+
+1. **The client has a query and is asked for their email; the conversation with the bot begins.**
+
+![Step 1: Client query and email, conversation with bot](assets/step-1.png)
+
+2. **The bot replies until the client asks to talk to a human.**
+
+![Step 2: Bot replies until client asks for human](assets/step-2.png)
+
+3. **An automation rule created by the Chatwoot administrator (Diego Leon) assigns the conversation to the sales team (Anthony Leon).**
+
+![Step 3: Automation rule assigns to sales team](assets/step-3.png)
+
+4. **Consultations are delegated to a human agent.**
+
+![Step 4: Delegation to human agent](assets/step-4.png)
+
+5. **The client stops replying and the human agent selects the Snooze option.**
+
+![Step 5: Human agent selects Snooze](assets/step-5.png)
+
+6. **The client is Snoozed until next reply and the conversation moves to the human agent's inbox. Then two inactivity automation rules run: one removes the `ai-off` label so the bot can attend when the client returns, and one sends a reminder message.**
+
+![Step 6: Snoozed, inbox, and inactivity automation rules](assets/step-6.png)
+
+7. **The client returns and the bot responds until the client asks to talk to a human again.**
+
+![Step 7: Client returns, bot responds](assets/step-7.png)
+
+8. **When the client returns, the conversation is assigned again to the sales team, who are waiting for clients who want to talk to them.**
+
+![Step 8: Conversation reassigned to sales team](assets/step-8.png)
+
 Configure the webhook URL in Chatwoot to `https://<your-app-host>/webhook`.
 
 ---
 
 ## Frontend with v0, Lovable or Similar Services
 
-- **`landing-page/prompt.txt`** — Example Chatwoot widget script (uses `BASE_URL` and `websiteToken`; see file contents). Use as template and replace with your Chatwoot inbox values.
-- **`landing-page/image.png`** — Reference image (present in repo).
+- **`assets/prompt.txt`** — Example Chatwoot widget script (uses `BASE_URL` and `websiteToken`; see file contents). Use as template and replace with your Chatwoot inbox values.
+- **`assets/landing-reference.png`** — Reference image (present in repo).
 
-![Landing page reference](landing-page/image.png)
+![Landing page reference](assets/landing-reference.png)
 
 To test locally, expose the app with [ngrok](https://ngrok.com) (e.g. `ngrok http 8000`) and set the Chatwoot webhook to `https://<ngrok-host>/webhook`.
 
