@@ -1,0 +1,39 @@
+# ============================================
+# Requirements - AI Agents with LangChain v1.0
+# ============================================
+
+# ============================================
+# LANGCHAIN v1.0
+# ============================================
+langchain>=1.0.0
+langchain-openai          # OpenAI models
+langchain-community       # Community tools and utilities
+
+# ============================================
+# CONVERSATION HISTORY (PostgreSQL)
+# ============================================
+langchain-postgres        # PostgresChatMessageHistory
+psycopg[binary]           # PostgreSQL v3 driver
+
+# ============================================
+# KNOWLEDGE BASE (RAG with Supabase)
+# ============================================
+supabase>=1.0.0           # Supabase client
+numpy                     # Cosine similarity calculation
+
+# ============================================
+# TOOLS
+# ============================================
+langchain-tavily          # Internet search (Tavily)
+
+# ============================================
+# WEB SERVER (Chatwoot Integration)
+# ============================================
+fastapi                   # Web framework
+uvicorn                   # ASGI server
+requests                  # HTTP client
+
+# ============================================
+# UTILITIES
+# ============================================
+python-dotenv             # Environment variables (.env)

@@ -1,0 +1,55 @@
+# Git and version control
+.git/
+.gitignore
+.gitattributes
+
+# Environment and secrets (pass at runtime with --env-file or -e)
+.env
+.env.*
+!.env.example
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments (dependencies installed in image via requirements.txt)
+venv/
+.venv/
+env/
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation and samples (not needed in container)
+README.md
+README-sample.md
+*.md
+docs/
+
+# Tests (optional: remove if you want tests inside the image)
+tests/
+*_test.py
+test_*.py
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build and CI (not needed at runtime)
+build.sh
+Dockerfile
+.dockerignore
+.github/
+
+# Logs and local data
+*.log
+logs/
