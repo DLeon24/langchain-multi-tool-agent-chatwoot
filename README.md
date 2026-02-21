@@ -288,7 +288,7 @@ The API listens on `http://0.0.0.0:8000` (see `uvicorn.run(..., host="0.0.0.0", 
 
 ### Ingest the Knowledge Base
 
-The RAG tool `search_ai_perupe` reads from the Supabase table `documents_langchain_sales_assistant` (see `tools/knowledge_base.py`). This project has no ingest endpoint. Populate that table (e.g. using [rag-agent-chatbot](https://github.com/DLeon24/rag-agent-chatbot): run `supabase-scripts/script.sql` in Supabase, then that project’s GET `/rag` to ingest the PDF). Once the table has documents, Agent 04 and `/test` can use the tool.
+RAG is used **from Agent 03 onward** (Agent 03 and Agent 04). The tool `search_ai_perupe` reads from the Supabase table `documents_langchain_sales_assistant` (see `tools/knowledge_base.py`). This project has no ingest endpoint. Populate that table (e.g. using [rag-agent-chatbot](https://github.com/DLeon24/rag-agent-chatbot): run `supabase-scripts/script.sql` in Supabase, then that project’s GET `/rag` to ingest the PDF). Once the table has documents, Agent 03, Agent 04 and the `/test` endpoint can use the tool.
 
 ### Run the Orchestrator (all agents from CLI)
 
