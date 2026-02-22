@@ -1,8 +1,10 @@
 """
 Complete AI Agent: Knowledge Base + Internet + Conversation History
+
 - Tool 1: Knowledge Base (RAG with Supabase)
 - Tool 2: Internet Search (Tavily)
 - History: Stores conversations in PostgreSQL
+- Exposes chat_with_agent(message, session_id) for Chatwoot integration
 """
 
 import os
@@ -14,7 +16,7 @@ from dotenv import find_dotenv, load_dotenv
 
 load_dotenv(find_dotenv())
 
-# Add root directory to path to import tools
+# Add root directory to path for importing tools
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import psycopg
@@ -22,9 +24,8 @@ from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_postgres import PostgresChatMessageHistory
 
-# Import tools from the tools/ folder
-from tools.knowledge_base import search_ai_perupe
 from tools.internet_search import search_internet
+from tools.knowledge_base import search_ai_perupe
 
 # ============================================
 # 1. DATABASE CONFIGURATION (History)
@@ -38,33 +39,26 @@ DB_NAME = os.getenv("DB_NAME", "postgres")
 if not all([DB_USER, DB_PASSWORD, DB_HOST]):
     raise ValueError(
         "❌ Missing database variables in .env\n"
-        "Required: DB_USER, DB_PASSWORD, DB_HOST"
+        "Required: DB_USER, DB_PASSWORD, DB_HOST\n"
+        "Optional: DB_PORT (default: 5432), DB_NAME (default: postgres)"
     )
 
 DATABASE_URL = (
     f"postgresql://{DB_USER}:{quote_plus(DB_PASSWORD)}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 )
 
-print(f"🔌 Connecting as: {DB_USER}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
-
 # ============================================
 # 2. AVAILABLE TOOLS LIST
 # ============================================
-tools = [
+TOOLS = [
     search_ai_perupe,  # AIPerupe Academy Knowledge Base
     search_internet,  # Internet Search (Tavily)
 ]
 
 # ============================================
-# 3. MODEL CONFIGURATION WITH TOOLS
+# 3. AGENT PROMPT
 # ============================================
-chat = init_chat_model("gpt-4o", temperature=0.7)
-chat_with_tools = chat.bind_tools(tools)
-
-# ============================================
-# 4. AGENT PROMPT
-# ============================================
-system_prompt = """You are ChattyBot, a AIPerupe Academy AI assistant with internet access.
+SYSTEM_PROMPT = """You are ChattyBot, a AIPerupe Academy AI assistant with internet access.
 
 Your goal is to help users by answering their questions using the available tools.
 
@@ -88,42 +82,147 @@ EXAMPLES:
 
 
 # ============================================
-# CREATE HISTORY TABLE
+# CONVERSATION LOOP (CLI)
 # ============================================
-def create_history_table():
-    try:
-        sync_connection = psycopg.connect(DATABASE_URL)
-        PostgresChatMessageHistory.create_tables(sync_connection, "chat_history")
-        sync_connection.close()
-    except Exception as e:
-        print(f"⚠️ Note about table: {e}")
+def main():
+    print(f"🔌 Connecting as: {DB_USER}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
+    _create_history_table()
 
+    print("=" * 60)
+    print("🤖 ChattyBot - COMPLETE Agent (KB + Internet + Memory)")
+    print("=" * 60)
+    print("🔧 Available tools:")
+    for t in TOOLS:
+        print(f"   - {t.name}")
+    print("💾 History: PostgreSQL")
 
-create_history_table()
+    print("\nSession options:")
+    print("  1. New conversation")
+    print("  2. Continue existing session (paste UUID)")
 
-
-# ============================================
-# CONVERSATION HISTORY
-# ============================================
-def get_session_history(session_id: str) -> PostgresChatMessageHistory:
+    session_id = _get_valid_session_id()
+    chat_with_tools = _get_chat_with_tools()
     sync_connection = psycopg.connect(DATABASE_URL)
+
+    print(f"\n📝 Session ID: {session_id}")
+    print("   (Save this ID to continue later)")
+    print("✅ The agent can search AIPerupe and the INTERNET")
+    print("Type 'exit' to return to the menu.\n")
+
+    try:
+        while True:
+            user_input = input("You: ").strip()
+
+            if user_input.lower() in ["salir", "exit", "quit"]:
+                print(f"\n💾 Your session has been saved.")
+                print(f"   UUID: {session_id}")
+                print("👋 Goodbye!")
+                break
+
+            if not user_input:
+                continue
+
+            try:
+                answer = _run_turn(
+                    chat_with_tools, sync_connection, user_input, session_id
+                )
+                print(f"\n🤖 ChattyBot: {answer}\n")
+            except Exception as e:
+                print(f"\n❌ Error: {e}\n")
+    finally:
+        sync_connection.close()
+
+
+# ============================================
+# CHAT WITH AGENT (public API for Chatwoot)
+# ============================================
+def chat_with_agent(user_message: str, session_id: str) -> str:
+    """
+    Runs the agent with tools and memory. Used by Chatwoot webhook.
+    Opens and closes its own DB connection.
+    """
+    chat_with_tools = _get_chat_with_tools()
+    with psycopg.connect(DATABASE_URL) as sync_connection:
+        history = _get_session_history(sync_connection, session_id)
+        final_answer = _invoke_agent(chat_with_tools, history, user_message)
+        history.add_user_message(user_message)
+        history.add_ai_message(final_answer)
+    return final_answer
+
+
+# ============================================
+# CREATE HISTORY TABLE (if it doesn't exist)
+# ============================================
+def _create_history_table():
+    """Creates the history table if it doesn't exist."""
+    try:
+        with psycopg.connect(DATABASE_URL) as sync_connection:
+            PostgresChatMessageHistory.create_tables(sync_connection, "chat_history")
+    except Exception as e:
+        print(f"⚠️ Error creating history table: {e}")
+
+
+# ============================================
+# GET VALID SESSION ID
+# ============================================
+def _get_valid_session_id() -> str:
+    option = input("\nChoose (1/2): ").strip()
+    if option == "2":
+        session_id = input("Paste the session UUID: ").strip()
+        try:
+            uuid.UUID(session_id)
+            return session_id
+        except ValueError:
+            print("⚠️ Invalid UUID. Creating new session...")
+            return str(uuid.uuid4())
+    return str(uuid.uuid4())
+
+
+# ============================================
+# GET CHAT MODEL WITH TOOLS
+# ============================================
+def _get_chat_with_tools():
+    """Initializes the chat model and binds the available tools."""
+    chat = init_chat_model("gpt-4o", temperature=0.7)
+    return chat.bind_tools(TOOLS)
+
+
+# ============================================
+# RUN ONE TURN (CLI – reuses connection and model)
+# ============================================
+def _run_turn(
+    chat_with_tools, sync_connection, user_message: str, session_id: str
+) -> str:
+    """Runs one agent turn with existing connection and model; persists and returns the answer."""
+    history = _get_session_history(sync_connection, session_id)
+    final_answer = _invoke_agent(chat_with_tools, history, user_message)
+    history.add_user_message(user_message)
+    history.add_ai_message(final_answer)
+    return final_answer
+
+
+# ============================================
+# GET SESSION HISTORY FROM POSTGRESQL
+# ============================================
+def _get_session_history(
+    sync_connection, session_id: str
+) -> PostgresChatMessageHistory:
+    """Retrieves or creates the history for a session from PostgreSQL."""
     return PostgresChatMessageHistory(
         "chat_history", session_id, sync_connection=sync_connection
     )
 
 
 # ============================================
-# CHAT FUNCTION WITH AGENT + TOOLS
+# INVOKE AGENT (core logic, no persistence)
 # ============================================
-def chat_with_agent(user_message: str, session_id: str) -> str:
+def _invoke_agent(chat_with_tools, history, user_message: str) -> str:
     """
-    Runs the agent with tools and memory.
-    The agent decides whether to use tools or respond directly.
+    Builds messages from history, invokes the agent (with optional tool calls),
+    and returns the final answer. Does not persist to history.
     """
-    history = get_session_history(session_id)
     previous_messages = history.messages
-
-    messages = [{"role": "system", "content": system_prompt}]
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     for msg in previous_messages:
         if isinstance(msg, HumanMessage):
@@ -132,7 +231,6 @@ def chat_with_agent(user_message: str, session_id: str) -> str:
             messages.append({"role": "assistant", "content": msg.content})
 
     messages.append({"role": "user", "content": user_message})
-
     response = chat_with_tools.invoke(messages)
 
     if response.tool_calls:
@@ -140,8 +238,7 @@ def chat_with_agent(user_message: str, session_id: str) -> str:
         for tool_call in response.tool_calls:
             tool_name = tool_call["name"]
             tool_args = tool_call["args"]
-
-            for t in tools:
+            for t in TOOLS:
                 if t.name == tool_name:
                     result = t.invoke(tool_args)
                     tool_results.append(
@@ -154,65 +251,7 @@ def chat_with_agent(user_message: str, session_id: str) -> str:
             messages.append(
                 ToolMessage(content=tr["result"], tool_call_id=tr["tool_call_id"])
             )
-
         final_response = chat_with_tools.invoke(messages)
-        final_answer = final_response.content
-    else:
-        final_answer = response.content
+        return final_response.content
 
-    history.add_user_message(user_message)
-    history.add_ai_message(final_answer)
-
-    return final_answer
-
-
-# ============================================
-# 8. CONVERSATION LOOP
-# ============================================
-def main():
-    print("=" * 60)
-    print("🤖 ChattyBot - COMPLETE Agent (KB + Internet + Memory)")
-    print("=" * 60)
-    print("🔧 Available tools:")
-    for t in tools:
-        print(f"   - {t.name}")
-    print("💾 History: PostgreSQL")
-
-    print("\nSession options:")
-    print("  1. New conversation")
-    print("  2. Continue existing session (paste UUID)")
-
-    option = input("\nChoose (1/2): ").strip()
-
-    if option == "2":
-        session_id = input("Paste the session UUID: ").strip()
-        try:
-            uuid.UUID(session_id)
-        except ValueError:
-            print("⚠️ Invalid UUID. Creating new session...")
-            session_id = str(uuid.uuid4())
-    else:
-        session_id = str(uuid.uuid4())
-
-    print(f"\n📝 Session ID: {session_id}")
-    print("   (Save this ID to continue later)")
-    print("✅ The agent can search AIPerupe and the INTERNET")
-    print("Type 'exit' to return to the menu.\n")
-
-    while True:
-        user_input = input("You: ").strip()
-
-        if user_input.lower() in ["salir", "exit", "quit"]:
-            print(f"\n💾 Your session has been saved.")
-            print(f"   UUID: {session_id}")
-            print("👋 Goodbye!")
-            break
-
-        if not user_input:
-            continue
-
-        try:
-            answer = chat_with_agent(user_input, session_id)
-            print(f"\n🤖 ChattyBot: {answer}\n")
-        except Exception as e:
-            print(f"\n❌ Error: {e}\n")
+    return response.content
