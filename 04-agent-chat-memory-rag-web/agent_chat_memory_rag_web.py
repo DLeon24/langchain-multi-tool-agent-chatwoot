@@ -24,6 +24,7 @@ from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_postgres import PostgresChatMessageHistory
 
+from tools.datetime import get_current_datetime
 from tools.internet_search import search_internet
 from tools.knowledge_base import search_ai_perupe
 
@@ -53,6 +54,7 @@ DATABASE_URL = (
 TOOLS = [
     search_ai_perupe,  # AIPerupe Academy Knowledge Base
     search_internet,  # Internet Search (Tavily)
+    get_current_datetime,  # Current date and time in a timezone
 ]
 
 # ============================================
@@ -62,15 +64,19 @@ SYSTEM_PROMPT = """You are ChattyBot, a AIPerupe Academy AI assistant with inter
 
 Your goal is to help users by answering their questions using the available tools.
 
+At the start of each shift, you'll see the CURRENT DATE AND TIME; use this whenever the answer depends on "today," "now," "this week," schedules, or deadlines. For other time zones, use the get_current_datetime tool.
+
 AVAILABLE TOOLS:
 1. search_ai_perupe: For information about AIPerupe Academy (programs, courses, prices, instructors)
 2. search_internet: For up-to-date information from the internet (news, events, current data)
+3. get_current_datetime: For the current date and time in a timezone
 
 INSTRUCTIONS:
 - For questions about AIPerupe Academy → USE search_ai_perupe
 - For questions about current events, news, or general information → USE search_internet
+- For "what time is it", "what day is it", "current date" in your time zone → You can use the CURRENT DATE AND TIME from the context; for another time zone → USE get_current_datetime
 - For greetings, thanks, or general conversation → Respond directly WITHOUT tools
-- You can use BOTH tools if the question requires it
+- You can use MULTIPLE tools if the question requires it
 - You remember the entire conversation thanks to your persistent memory
 - Always respond in a clear and friendly manner
 
@@ -78,7 +84,8 @@ EXAMPLES:
 - "Hello" → Respond directly
 - "What courses do you offer?" → Use search_ai_perupe
 - "What happened in the news today?" → Use search_internet
-- "How does your AI course compare to current trends?" → Use BOTH tools"""
+- "What time is it?" or "What day is it today?" → Use get_current_datetime
+- "How does your AI course compare to current trends?" → Use BOTH tools (search_ai_perupe and search_internet)"""
 
 
 # ============================================
