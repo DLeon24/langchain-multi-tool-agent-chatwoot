@@ -28,53 +28,53 @@ This project is an **AI Agent Orchestrator** that runs four progressively comple
 
 - **Agents 01–04**: Run from the CLI via `main.py` (orchestrator) or directly from each agent folder. They evolve from stateless chat to memory + RAG + internet tools.
 - **Chatwoot integration**: Implemented in `chatwoot_base.py`, which loads Agent 04 and exposes a single `/webhook` endpoint. Three entry points (`main_chatwoot_opt_in.py`, `main_chatwoot_opt_out.py`, `main_chatwoot_bot.py`) create the same app with different **label strategies** and optional **bot token** for identity.
-- **Tools**: RAG over Supabase (`search_ai_perupe`), internet search via Tavily (`search_internet`). Conversation history is stored in PostgreSQL (e.g. Supabase pooler).
+- **Tools**: RAG over Supabase (`search_ai_perupe`) and Pinecone (`search_details_ai_perupe`), internet search via Tavily (`search_internet`), and a timezone-aware date/time tool (`get_current_datetime`). Conversation history is stored in PostgreSQL (e.g. Supabase pooler).
 
 ---
 
 ## Architecture Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                    User / Chatwoot Widget                         │
-└──────────────────────┬────────────────────────────────────────────┘
-                       │  Chatwoot UI
-                       ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                     Chatwoot Server                               │
-│  (message_created → POST /webhook to your app)                    │
-└──────────────────────┬────────────────────────────────────────────┘
-                       │  HTTP POST /webhook
-                       ▼
-┌──────────────────────────────────────────────────────────────────┐
-│              FastAPI Backend (chatwoot_base.py)                   │
-│                                                                  │
-│  ┌─────────────────┐  ┌──────────────┐  ┌─────────────────────┐ │
-│  │  GET /           │  │  GET /health │  │  GET /test           │ │
-│  └─────────────────┘  └──────────────┘  └─────────────────────┘ │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │  POST /webhook → Agent 04 (agent_chat_memory_rag_web.py)     ││
-│  │  chat_with_agent(message, session_id)                        ││
-│  │  ┌─────────────────┐  ┌─────────────────┐                    ││
-│  │  │ search_ai_perupe │  │ search_internet │  (Tavily)          ││
-│  │  │ (RAG / Supabase) │  │                 │                    ││
-│  │  └────────┬────────┘  └────────┬────────┘                    ││
-│  │           │                     │                            ││
-│  │           ▼                     ▼                            ││
-│  │  ┌─────────────────────────────────────────────────────────┐ ││
-│  │  │           OpenAI (LLM + embeddings)                      │ ││
-│  │  └─────────────────────────────────────────────────────────┘ ││
-│  └─────────────────────────────────────────────────────────────┘│
-└──────────────────────┬────────────────────┬─────────────────────┘
-                        │                    │
-        ┌───────────────┘                    └───────────────┐
-        ▼                                                    ▼
-┌─────────────────────────────┐    ┌────────────────────────────────┐
-│  Supabase (PostgreSQL)       │    │  Supabase (RAG)                 │
-│  chat_history (session_id)   │    │  documents_langchain_...        │
-│  Conversation memory         │    │  pgvector + match_documents_...  │
-└─────────────────────────────┘    └────────────────────────────────┘
+                                  ┌─────────────────────────┐
+                                  │ User / Chatwoot Widget  │                        
+                                  └───────────┬─────────────┘
+                                              │  Chatwoot UI
+                                              ▼
+                         ┌────────────────────────────────────────────────┐
+                         │             Chatwoot Server                    │
+                         │  (message_created → POST /webhook to your app) │
+                         └────────────────────────────────────────────────┘
+                                              │  HTTP POST /webhook
+                                              ▼                     
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│                               FastAPI Backend (chatwoot_base.py)                             │
+│                                                                                              │
+│              ┌─────────────────┐  ┌──────────────┐  ┌───────────────────────────┐            │
+│              │  GET /          │  │  GET /health │  │  GET /test, GET /indexing │            │
+│              └─────────────────┘  └──────────────┘  └───────────────────────────┘            │
+│                                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────────┐ │    
+│  │                POST /webhook → Agent 04 (agent_chat_memory_rag_web.py)                  │ │
+│  │                                         chat_with_agent(message, session_id)            │ │
+│  │                                                                                         │ │
+│  │  ┌──────────────────────┬──────────────────────┬────────────────┬─────────────────────┐ │ │
+│  │  │ search_ai_perupe     │ search_details_...   │ search_internet│ get_current_datetime│ │ │
+│  │  │ (RAG / Supabase)     │ (RAG / Pinecone)     │ (Tavily)       │ (timezone-aware)    │ │ │
+│  │  └───────────┬──────────┴──────────┬───────────┴──────────┬─────┴─────────┬───────────┘ │ │
+│  │              │                     │                      │               │             │ │
+│  │   ┌──────────└─────────────────────┴──────────────────────┴───────────────┴──────────┐  │ │
+│  │   │                                       OpenAI (LLM + embeddings)                  │  │ │
+│  │   └──────────────────────────────────────────────────────────────────────────────────┘  │ │
+│  └─────────────────────────────────────────────────────────────────────────────────────────┘ │
+└─────────────┬───────────────────────────────┬──────────────────────────────────────┬─────────┘
+              │                               │                                      │
+              │                               │                                      │
+              ▼                               ▼                                      ▼
+┌─────────────────────────────┐    ┌────────────────────────────────────┐   ┌─────────────────┐
+│  Supabase (PostgreSQL)      │    │  Supabase (RAG)                    │   │  Pinecone (RAG) │
+│  chat_history (session_id)  │    │  documents_langchain_...           │   │  index / vectors│
+│  Conversation memory        │    │  pgvector + match_documents_...    │   └─────────────────┘
+└─────────────────────────────┘    └────────────────────────────────────┘
 ```
 
 **Key points:**
@@ -93,8 +93,9 @@ This project is an **AI Agent Orchestrator** that runs four progressively comple
 | Framework | FastAPI, Uvicorn (`requirements.txt`) |
 | LLM / Agent | LangChain ≥1.0 (`langchain`, `langchain-openai`), OpenAI GPT-4o (`init_chat_model("gpt-4o")` in agents) |
 | Conversation history | PostgreSQL (`langchain-postgres`, `psycopg`); table `chat_history` created in code via `PostgresChatMessageHistory.create_tables`. |
-| RAG | Supabase table `documents_langchain_sales_assistant` (`tools/knowledge_base.py`), OpenAI `text-embedding-ada-002`, numpy cosine similarity (in-process). |
+| RAG | Supabase table `documents_langchain_sales_assistant` (`tools/knowledge_base.py`) **and** Pinecone index (default `langchain-pinecone-sales-assistant`) (`tools/knowledge_base_pinecone.py`, `indexing/indexing_pinecone.py`); OpenAI `text-embedding-ada-002`, numpy cosine similarity (Supabase) / vector similarity search (Pinecone). |
 | Internet search | Tavily (`langchain-tavily`, `tools/internet_search.py`) |
+| Time & date | Built-in timezone tool (`tools/datetime.py`, `get_current_datetime`) using stdlib `zoneinfo` and configurable via `AGENT_TIMEZONE`. |
 | Chatwoot | REST: webhook inbound, `send_message` / `update_labels` outbound (`chatwoot_base.py`) |
 | Env / config | `python-dotenv`, `.env` (see `.gitignore`) |
 
@@ -120,14 +121,19 @@ This project is an **AI Agent Orchestrator** that runs four progressively comple
 ├── 02-agent-chat-memory/
 │   └── agent_chat_memory.py          # Agent 02: chat + PostgreSQL conversation history
 ├── 03-agent-chat-memory-rag/
-│   └── agent_chat_memory_rag.py      # Agent 03: memory + RAG tool (search_ai_perupe)
+│   └── agent_chat_memory_rag.py      # Agent 03: memory + RAG tools (Supabase + Pinecone)
 ├── 04-agent-chat-memory-rag-web/
 │   └── agent_chat_memory_rag_web.py  # Agent 04: memory + RAG + Tavily; chat_with_agent()
 ├── tools/
 │   ├── __init__.py
 │   ├── knowledge_base.py             # search_ai_perupe (Supabase)
+│   ├── knowledge_base_pinecone.py    # search_details_ai_perupe (Pinecone)
+│   ├── datetime.py                   # get_current_datetime (timezone-aware)
 │   └── internet_search.py            # search_internet (Tavily)
+├── indexing/
+│   └── indexing_pinecone.py          # PDF → chunks → Pinecone index pipeline
 └── assets/
+    ├── AIPerupe_Academy_details.pdf  # Source PDF for Pinecone index
     ├── prompt.txt                    # Script snippet for Chatwoot widget
     ├── landing-reference.png         # Landing reference image
     └── step-1.png … step-8.png       # Example flow screenshots
@@ -141,8 +147,8 @@ This project is an **AI Agent Orchestrator** that runs four progressively comple
 |-------|--------|-------------|--------|-------|
 | **01** | `01-agent-chat/` | Basic chat, no memory. Single prompt + LLM (GPT-4o). | None | None |
 | **02** | `02-agent-chat-memory/` | Same model + prompt, with **persistent conversation history** in PostgreSQL via `langchain_postgres.PostgresChatMessageHistory`. Session identified by UUID. | PostgreSQL | None |
-| **03** | `03-agent-chat-memory-rag/` | Adds **RAG as a tool**: `search_ai_perupe` (Supabase knowledge base). LLM decides when to call the tool. History still in PostgreSQL. | PostgreSQL | `search_ai_perupe` |
-| **04** | `04-agent-chat-memory-rag-web/` | Adds **internet search** tool (`search_internet`, Tavily). Full stack: memory + RAG + web. Exposes `chat_with_agent(message, session_id)` used by Chatwoot. | PostgreSQL | `search_ai_perupe`, `search_internet` |
+| **03** | `03-agent-chat-memory-rag/` | Adds **RAG as tools**: `search_ai_perupe` (Supabase knowledge base) and `search_details_ai_perupe` (Pinecone knowledge base). LLM decides when to call the tools. History still in PostgreSQL. | PostgreSQL | `search_ai_perupe`, `search_details_ai_perupe` |
+| **04** | `04-agent-chat-memory-rag-web/` | Adds **internet search** tool (`search_internet`, Tavily) and a **timezone-aware date/time tool** (`get_current_datetime`). Full stack: memory + dual RAG (Supabase + Pinecone) + web + time. Exposes `chat_with_agent(message, session_id)` used by Chatwoot. | PostgreSQL | `search_ai_perupe`, `search_details_ai_perupe`, `search_internet`, `get_current_datetime` |
 
 Evolution summary:
 
@@ -239,6 +245,7 @@ To test locally, expose the app with [ngrok](https://ngrok.com) (e.g. `ngrok htt
 - **Python 3.11+**
 - **PostgreSQL** (or Supabase with session pooler) for conversation history
 - **Supabase project** for RAG (table + embeddings)
+- **Pinecone account & index** (optional but recommended for the details knowledge base used by `search_details_ai_perupe` and the `/indexing` endpoint)
 - **OpenAI API key** and **Tavily API key** (create an account at [Tavily](https://tavily.com) to obtain `TAVILY_API_KEY` for the `search_internet` tool)
 - **Chatwoot instance** (see [Chatwoot Installation](#chatwoot-installation))
 - **Docker** (optional, for containerized deployment)
@@ -282,6 +289,9 @@ Create a `.env` file in the project root with the following variables. Do not co
 | `DB_NAME` | No | Default `postgres`. |
 | `SUPABASE_URL` | Yes | Supabase project URL for RAG. |
 | `SUPABASE_SERVICE_KEY` | Yes | Supabase service role key (for RAG table). |
+| `PINECONE_API_KEY` | For Pinecone | Pinecone API key for the details knowledge base (`search_details_ai_perupe`) and the indexing pipeline. |
+| `PINECONE_INDEX_NAME` | No | Optional Pinecone index name (defaults differ by module; see `tools/knowledge_base_pinecone.py` and `indexing/indexing_pinecone.py` if you rely on defaults). |
+| `AGENT_TIMEZONE` | No | Default timezone for `get_current_datetime` (e.g. `America/Lima`). |
 | `TAVILY_API_KEY` | Yes | Tavily API key for `search_internet`. Create an account at [Tavily](https://tavily.com) to get it. |
 | `CHATWOOT_BASE_URL` | For Chatwoot | Chatwoot base URL (e.g. `https://chatwoot.example.com`). |
 | `CHATWOOT_ACCOUNT_ID` | For Chatwoot | Chatwoot account ID. |
@@ -325,7 +335,19 @@ The API listens on `http://0.0.0.0:8000` (see `uvicorn.run(..., host="0.0.0.0", 
 
 ### Ingest the Knowledge Base
 
-RAG is used **from Agent 03 onward** (Agent 03 and Agent 04). The tool `search_ai_perupe` reads from the Supabase table `documents_langchain_sales_assistant` (see `tools/knowledge_base.py`). This project has no ingest endpoint. Populate that table (e.g. using [rag-agent-chatbot](https://github.com/DLeon24/rag-agent-chatbot): run `supabase-scripts/script.sql` in Supabase, then that project’s GET `/rag` to ingest the PDF). Once the table has documents, Agent 03, Agent 04 and the `/test` endpoint can use the tool.
+RAG is used **from Agent 03 onward** (Agent 03 and Agent 04). There are **two knowledge bases**:
+
+- **Supabase (courses/programs, `search_ai_perupe`)** — `search_ai_perupe` reads from the Supabase table `documents_langchain_sales_assistant` (see `tools/knowledge_base.py`). This project has no ingest endpoint for Supabase. Populate that table (e.g. using [rag-agent-chatbot](https://github.com/DLeon24/rag-agent-chatbot): run `supabase-scripts/script.sql` in Supabase, then that project’s GET `/indexing` to ingest the PDF). Once the table has documents, Agent 03, Agent 04 and the `/test` endpoint can use the tool.
+- **Pinecone (details/alliances/benefits, `search_details_ai_perupe`)** — `search_details_ai_perupe` reads from a Pinecone index (see `tools/knowledge_base_pinecone.py`). This repo **does** include an ingest pipeline for Pinecone:
+  - Ensure you have `PINECONE_API_KEY` (and optionally `PINECONE_INDEX_NAME`) set in `.env`.
+  - Make sure `assets/AIPerupe_Academy_details.pdf` contains your latest details content.
+  - Start any Chatwoot entry app (opt-in/opt-out/bot) and call:
+
+    ```bash
+    curl http://localhost:8000/indexing
+    ```
+
+    This triggers `indexing/indexing_pinecone.py`, which loads the PDF, splits it into chunks, embeds with OpenAI, and stores everything in Pinecone. The endpoint returns how many chunks were indexed.
 
 ### Run the Orchestrator (all agents from CLI)
 
