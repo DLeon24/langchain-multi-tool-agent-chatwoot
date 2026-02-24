@@ -27,6 +27,7 @@ from langchain_postgres import PostgresChatMessageHistory
 from tools.datetime import get_current_datetime
 from tools.internet_search import search_internet
 from tools.knowledge_base import search_ai_perupe
+from tools.knowledge_base_pinecone import search_details_ai_perupe
 
 # ============================================
 # 1. DATABASE CONFIGURATION (History)
@@ -52,9 +53,10 @@ DATABASE_URL = (
 # 2. AVAILABLE TOOLS LIST
 # ============================================
 TOOLS = [
-    search_ai_perupe,  # AIPerupe Academy Knowledge Base
+    search_ai_perupe,  # AIPerupe Academy Knowledge Base (Supabase)
     search_internet,  # Internet Search (Tavily)
     get_current_datetime,  # Current date and time in a timezone
+    search_details_ai_perupe,  # AIPerupe Academy Knowledge Base (Pinecone)
 ]
 
 # ============================================
@@ -70,9 +72,11 @@ AVAILABLE TOOLS:
 1. search_ai_perupe: For information about AIPerupe Academy (programs, courses, prices, instructors)
 2. search_internet: For up-to-date information from the internet (news, events, current data)
 3. get_current_datetime: For the current date and time in a timezone
+4. search_details_ai_perupe: For details about AIPerupe Academy (Live and On-Demand programs, alliances, benefits, support)
 
 INSTRUCTIONS:
 - For questions about AIPerupe Academy → USE search_ai_perupe
+- For details about AIPerupe Academy (Live and On-Demand programs, alliances, benefits, support), USE the search_details_ai_perupe tool.
 - For questions about current events, news, or general information → USE search_internet
 - For "what time is it", "what day is it", "current date" in your time zone → You can use the CURRENT DATE AND TIME from the context; for another time zone → USE get_current_datetime
 - For greetings, thanks, or general conversation → Respond directly WITHOUT tools
@@ -85,7 +89,14 @@ EXAMPLES:
 - "What courses do you offer?" → Use search_ai_perupe
 - "What happened in the news today?" → Use search_internet
 - "What time is it?" or "What day is it today?" → Use get_current_datetime
-- "How does your AI course compare to current trends?" → Use BOTH tools (search_ai_perupe and search_internet)"""
+- "How does your AI course compare to current trends?" → Use BOTH tools (search_ai_perupe and search_internet)"
+
+EXAMPLES of when to USE search_details_ai_perupe:
+- "What are the details of live or on-demand programs?" → Use the "search_details_ai_perupe" tool
+- "What are the duration of live or on-demand programs?" → Use the "search_details_ai_perupe" tool
+- "What are the benefits of the AI program?" → Use the "search_details_ai_perupe" tool
+- "What are the alliances of AIPerupe Academy?" → Use the "search_details_ai_perupe" tool
+- "What is the support for the AI program?" → Use the "search_details_ai_perupe" tool"""
 
 
 # ============================================

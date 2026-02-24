@@ -49,7 +49,7 @@ def search_ai_perupe(query: str) -> str:
     Args:
         query: The question or topic to search for
     """
-    print(f"   🔍 Searching: '{query}'")
+    print(f"   🔍 Searching (Supabase): '{query}'")
     return _retrieve_from_knowledge_base(query)
 
 
@@ -118,7 +118,7 @@ def _retrieve_from_knowledge_base(query: str, top_k: int = 5) -> str:
         return context
 
     except Exception as e:
-        return f"Retrieval error: {str(e)}"
+        return f"Retrieval error (Supabase): {str(e)}"
 
 
 def _cosine_distance(vec1: list | np.ndarray, vec2: list | np.ndarray) -> float:

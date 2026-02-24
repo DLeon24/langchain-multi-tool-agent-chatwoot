@@ -26,6 +26,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_postgres import PostgresChatMessageHistory
 
 from tools.knowledge_base import search_ai_perupe
+from tools.knowledge_base_pinecone import search_details_ai_perupe
 
 # ============================================
 # 1. DATABASE CONFIGURATION (History)
@@ -52,6 +53,7 @@ DATABASE_URL = (
 # ============================================
 TOOLS = [
     search_ai_perupe,
+    search_details_ai_perupe,
 ]
 
 # ============================================
@@ -63,6 +65,7 @@ Your goal is to help users by answering their questions.
 
 INSTRUCTIONS:
 - For questions about AIPerupe Academy (programs, courses, prices, instructors), USE the search_ai_perupe tool.
+- For details about AIPerupe Academy (Live and On-Demand programs, alliances, benefits, support), USE the search_details_ai_perupe tool.
 - For greetings, thanks, or general conversation, respond directly WITHOUT using tools.
 - You remember the entire conversation thanks to your persistent memory.
 - Always respond in English in a clear and friendly manner.
@@ -75,7 +78,14 @@ EXAMPLES of when NOT to use tools:
 EXAMPLES of when to USE search_ai_perupe:
 - "What courses do you offer?" → Use the "search_ai_perupe" tool
 - "How much does the AI program cost?" → Use the "search_ai_perupe" tool
-- "Who are the instructors?" → Use the "search_ai_perupe" tool"""
+- "Who are the instructors?" → Use the "search_ai_perupe" tool"
+
+EXAMPLES of when to USE search_details_ai_perupe:
+- "What are the details of live or on-demand programs?" → Use the "search_details_ai_perupe" tool
+- "What are the duration of live or on-demand programs?" → Use the "search_details_ai_perupe" tool
+- "What are the benefits of the AI program?" → Use the "search_details_ai_perupe" tool
+- "What are the alliances of AIPerupe Academy?" → Use the "search_details_ai_perupe" tool
+- "What is the support for the AI program?" → Use the "search_details_ai_perupe" tool"""
 
 
 # ============================================
