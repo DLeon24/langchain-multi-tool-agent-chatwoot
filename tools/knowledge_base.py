@@ -38,7 +38,7 @@ DOCUMENTS_TABLE = "documents_langchain_sales_assistant"
 @tool
 def search_ai_perupe(query: str) -> str:
     """
-    Searches for information about AIPerupe Academy in the knowledge base.
+    Searches the AIPerupe Academy knowledge base (RAG) for relevant information.
     Use this tool when the user asks about:
     - AIPerupe Academy programs
     - Courses and content
@@ -50,7 +50,7 @@ def search_ai_perupe(query: str) -> str:
         query: The question or topic to search for
     """
     print(f"   🔍 Searching: '{query}'")
-    return _search_knowledge_base(query)
+    return _retrieve_from_knowledge_base(query)
 
 
 # ============================================
@@ -59,65 +59,70 @@ def search_ai_perupe(query: str) -> str:
 MIN_SIMILARITY = 0.3
 
 
-def _search_knowledge_base(query: str, top_k: int = 5) -> str:
+def _retrieve_from_knowledge_base(query: str, top_k: int = 5) -> str:
     """
-    Internal RAG search function.
+    RAG retrieval: embed the query, score by cosine similarity, and return the top_k chunks.
 
     Args:
-        query: Search query
-        top_k: Number of documents to return
+        query: User question or topic to retrieve context for.
+        top_k: Maximum number of chunks to return (default is 5).
 
     Returns:
-        str: Formatted information found
+        A formatted string containing the retrieved chunks and their relevance scores,
+        or an error message if retrieval fails.
     """
     try:
         # Generate query embedding
         query_embedding = embedding_model.embed_query(query)
 
         # Fetch documents from Supabase
-        result = supabase_client.table(DOCUMENTS_TABLE).select("*").execute()
+        result = (
+            supabase_client.table(DOCUMENTS_TABLE)
+            .select("content, embedding")
+            .execute()
+        )
 
         if not result.data:
             return "No documents found in the knowledge base."
 
-        # Compute similarity for each document
-        scored_documents = []
-        for doc in result.data:
-            if doc.get("embedding"):
-                doc_embedding = doc["embedding"]
+        # Score each chunk by cosine distance (lower = more similar)
+        chunks_with_distance = []
+        for row in result.data:
+            if row.get("embedding"):
+                doc_embedding = row["embedding"]
                 if isinstance(doc_embedding, str):
                     doc_embedding = json.loads(doc_embedding)
 
                 doc_embedding = [float(x) for x in doc_embedding]
-                score = _cosine_distance(query_embedding, doc_embedding)
-                similarity = 1 - score
+                distance = _cosine_distance(query_embedding, doc_embedding)
+                similarity = 1 - distance
 
                 if similarity >= MIN_SIMILARITY:
-                    scored_documents.append(
-                        {"content": doc.get("content", ""), "score": score}
+                    chunks_with_distance.append(
+                        {"content": row.get("content", ""), "distance": distance}
                     )
 
-        # Sort by similarity
-        scored_documents.sort(key=lambda x: x["score"])
-        top_docs = scored_documents[:top_k]
+        # Sort by distance ascending (closest first)
+        chunks_with_distance.sort(key=lambda x: x["distance"])
+        top_chunks = chunks_with_distance[:top_k]
 
-        if not top_docs:
+        if not top_chunks:
             return "No relevant information found for your query."
 
-        # Format results
+        # Format retrieved context
         context = "Information found:\n\n"
-        for i, doc in enumerate(top_docs, 1):
-            similarity = 1 - doc["score"]
-            context += f"[{i}] (Relevance: {similarity:.0%})\n{doc['content']}\n\n"
+        for i, chunk in enumerate(top_chunks, 1):
+            similarity = 1 - chunk["distance"]
+            context += f"[{i}] (Relevance: {similarity:.0%})\n{chunk['content']}\n\n"
 
         return context
 
     except Exception as e:
-        return f"Search error: {str(e)}"
+        return f"Retrieval error: {str(e)}"
 
 
-def _cosine_distance(vec1, vec2):
-    """Computes the cosine distance between two vectors."""
+def _cosine_distance(vec1: list | np.ndarray, vec2: list | np.ndarray) -> float:
+    """Computes the cosine distance between two vectors (1 - cosine_similarity)."""
     vec1 = np.array(vec1)
     vec2 = np.array(vec2)
     return 1 - np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))

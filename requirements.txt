@@ -22,6 +22,14 @@ supabase>=1.0.0           # Supabase client
 numpy                     # Cosine similarity calculation
 
 # ============================================
+# KNOWLEDGE BASE (RAG with Pinecone)
+# ============================================
+langchain-pinecone        # Pinecone client
+langchain-text-splitters  # RecursiveCharacterTextSplitter (RAG)
+pinecone                  # Pinecone client
+pypdf>=3.0.0              # PDF loader (RAG)
+
+# ============================================
 # TOOLS
 # ============================================
 langchain-tavily          # Internet search (Tavily)

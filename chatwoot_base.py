@@ -14,6 +14,8 @@ import uvicorn
 from dotenv import find_dotenv, load_dotenv
 from fastapi import FastAPI, Request
 
+from indexing.indexing_pinecone import run_indexing
+
 load_dotenv(find_dotenv())
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -354,6 +356,26 @@ def create_app(config: dict) -> FastAPI:
         except Exception as e:
             print(f"   ❌ Error: {e}")
             return {"message": message, "error": str(e), "status": "error"}
+
+    @app.get("/indexing")
+    async def indexing():
+        """
+        GET endpoint that runs the indexing pipeline: load PDF, split, embed and store in Pinecone.
+        """
+        try:
+            chunks_count = run_indexing()
+            return {
+                "success": True,
+                "message": "Indexing pipeline completed successfully",
+                "chunks_indexed": chunks_count,
+            }
+        except Exception as e:
+            print(f"❌ Indexing pipeline error: {e}")
+            return {
+                "success": False,
+                "message": "Indexing pipeline error",
+                "error": str(e),
+            }
 
     return app
 
