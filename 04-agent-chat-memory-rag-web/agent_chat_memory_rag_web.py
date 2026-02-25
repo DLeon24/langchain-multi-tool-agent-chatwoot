@@ -24,10 +24,12 @@ from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_postgres import PostgresChatMessageHistory
 
-from tools.datetime import get_current_datetime
-from tools.internet_search import search_internet
-from tools.knowledge_base import search_ai_perupe
-from tools.knowledge_base_pinecone import search_details_ai_perupe
+from tools import (
+    get_current_datetime,
+    search_ai_perupe,
+    search_details_ai_perupe,
+    search_internet,
+)
 
 # ============================================
 # 1. DATABASE CONFIGURATION (History)
