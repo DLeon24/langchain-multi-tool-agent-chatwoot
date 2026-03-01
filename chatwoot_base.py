@@ -241,7 +241,6 @@ def create_app(config: dict) -> FastAPI:
     async def chatwoot_webhook(request: Request):
         """Endpoint that receives Chatwoot webhooks."""
         data = await request.json()
-        print(data)
 
         event = data.get("event")
         message_type = data.get("message_type")
