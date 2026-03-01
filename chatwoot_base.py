@@ -48,6 +48,7 @@ CHATWOOT_API_TOKEN = os.getenv("CHATWOOT_API_ACCESS_TOKEN")
 CHATWOOT_BOT_TOKEN = os.getenv("CHATWOOT_BOT_TOKEN", CHATWOOT_API_TOKEN)
 CHATWOOT_BOT_LABEL = os.getenv("CHATWOOT_BOT_LABEL", "ai-attends")
 CHATWOOT_AI_OFF_LABEL = os.getenv("CHATWOOT_AI_OFF_LABEL", "ai-off")
+ALLOWED_PHONE_NUMBER = os.getenv("ALLOWED_PHONE_NUMBER")
 
 HUMAN_KEYWORDS = [
     "human",
@@ -240,6 +241,7 @@ def create_app(config: dict) -> FastAPI:
     async def chatwoot_webhook(request: Request):
         """Endpoint that receives Chatwoot webhooks."""
         data = await request.json()
+        print(data)
 
         event = data.get("event")
         message_type = data.get("message_type")
@@ -247,6 +249,13 @@ def create_app(config: dict) -> FastAPI:
         labels = conversation.get("labels", [])
         message_content = data.get("content")
         conversation_id = conversation.get("id")
+
+        meta = conversation.get("meta", {})
+        sender = meta.get("sender", {})
+        phone_number = sender.get("phone_number")
+
+        if phone_number != ALLOWED_PHONE_NUMBER:
+            return {"status": "ignored", "reason": "Not allowed phone number"}
 
         print(f"\n{'='*60}")
         print(f"📩 Webhook received: {event}")
